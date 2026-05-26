@@ -1,126 +1,138 @@
-# SPA Health Checker
+# ZME Health Checker
 
-Standalone Playwright-based runtime checker for SPA route health.
+Playwright-based runtime health checker for SPA routes.
 
-This repository is intentionally separate from `fe-app` and is designed to catch frontend runtime failures before production deployment.
+This project runs **outside** the frontend app and catches runtime breakages before production rollout (for example: `Cannot read properties of undefined`, redirect mismatches, blank/error pages).
 
-## What It Checks
+## What This Does
 
-- JS runtime exceptions (`pageerror`)
-- Serious browser console errors (`console.error`)
-- Error-boundary fallback UI text/selectors
-- Blank-page rendering
-- Unexpected final URL for redirect routes
+- Opens configured routes in a real browser session
+- Detects runtime failures:
+  - page exceptions (`pageerror`)
+  - important console runtime errors
+  - unexpected redirect destinations
+  - blank/error-boundary style screens
+- Captures screenshots for failed routes
+- Generates machine-readable + human-readable reports
+- Produces a live progress UI while checks are running
+- Optionally generates an AI remediation handoff for zippy automation
 
-## Routes Covered (Current Scope)
+## Project Layout
 
-Current route set is derived from selected dashboard/home/reports sections in `fe-app/src/framework/routes/routes.tsx`:
+- `routes/routes.ts` — route inventory to validate
+- `config/env.ts` — all runtime configuration
+- `src/health-check.ts` — main runner
+- `src/auth.ts` — login/session state capture
+- `src/runner.ts` — per-route execution and validation
+- `src/detectors.ts` — failure signal collection
+- `src/live-ui.ts` — live HTML progress view
+- `src/remediation.ts` — AI handoff and optional zippy command orchestration
 
-- `/`, `/home`, `/home/widget/new`
-- `/dashboard`, `/dashboard/widget/new`, `/dashboard/widget/:id`
-- reports routes from `/reports` through `/reports/templates` in the provided range
+## Quick Start
 
-Parametric routes (`:id`) are included but default to `SKIPPED` until you provide `params`.
-
-## Setup
-
-1. Install dependencies:
+### 1) Install dependencies
 
 ```bash
 npm install
 ```
 
-2. Install browser binaries:
+### 2) Install Playwright browser
 
 ```bash
 npx playwright install chromium
 ```
 
-3. Copy and configure environment:
+### 3) Configure environment
 
 ```bash
 cp .env.example .env
 ```
 
-Required values:
+Minimum required values:
+- `BASE_URL` should be **origin only** (example: `https://phoenix.app.zetaglobal.net`)
+- `E2E_USER` for scripted auth mode: `email@example.com:password`
 
-- `BASE_URL` origin only (example: `https://qa.example.com`, not `https://qa.example.com/signin`)
-- `E2E_USER` (format: `email@example.com:password`) for scripted login mode
+## Running the App
 
-## Run
-
-### Save auth state once
-
-Scripted login with credentials from `E2E_USER`:
-
-```bash
-npm run auth:save
-```
-
-Interactive ZMP/SSO login (recommended when MFA/redirect flow is involved):
-
-```bash
-npm run auth:save:interactive
-```
-
-This opens a headed browser. If `E2E_USER` is present it pre-fills email/password and clicks the login CTA automatically, then you complete any remaining sign-in steps manually (useful for SSO/MFA). The checker saves `.auth/storageState.json` automatically after login succeeds.
-
-### Run health checks
-
-```bash
-npm run dev
-```
-
-Run in headed mode (watch route navigation/failures live):
-
-```bash
-npm run dev:headed
-```
-
-Run headed auth then headed checks in one command:
+### One command (headed auth + headed checks)
 
 ```bash
 pnpm dev:headed:with-auth
 ```
 
-### Build and run compiled output
+### Or step-by-step
+
+Save auth state once:
 
 ```bash
-npm run build
-npm start
+npm run auth:save:headed
 ```
 
-## Output
+Then run checks in headed mode:
 
-- Console summary with PASS/FAIL/SKIPPED
-- Failure screenshots in `screenshots/`
-- JSON report in `reports/`
-- Live progress UI in `reports/live-progress.html` (auto-refreshes every second)
-- Auto-remediation handoff in `reports/zippy-handoff-<timestamp>.md` when failures exist
-- Exit code:
-  - `0` when no route fails
-  - `1` when any route fails
+```bash
+npm run dev:headed
+```
 
-## Config Highlights
+Headless mode:
 
-- `AUTH_MODE=ui-login` (default): auto-login when auth state is missing/stale
-- `AUTH_MODE=storage-only`: require existing `.auth/storageState.json`
-- `AUTH_SUCCESS_SELECTOR`: selector that indicates login success (default `[class^="Navbar"]`)
-- `INTERACTIVE_AUTH_TIMEOUT_MS`: max wait for interactive sign-in before failing
-- `HEALTH_CHECK_CONCURRENCY`: worker count (default `1`)
-- `HEALTH_CHECK_HEADLESS`: run visible browser (`false`) or headless (`true`)
-- `HEALTH_CHECK_SLOW_MO_MS`: slow down browser actions for debugging (default `0`)
-- `TARGET_CODEBASE_PATH`: local path to the repo that should be analyzed for fixes (default `../fe-app`)
-- `AUTO_REMEDIATION_ENABLED`: when `true`, runs configured zippy commands after generating handoff
-- `ZIPPY_COMMAND`: command template to run zippy with handoff file argument (example: `zippy fix --input`)
-- `ZIPPY_MR_COMMAND`: optional follow-up command to create MR after zippy fix step
-- `IGNORE_CONSOLE_ERRORS`: pipe-delimited ignore substrings (defaults to ignoring generic `Failed to load resource` browser asset noise)
-- `ERROR_BOUNDARY_SELECTORS`: pipe-delimited CSS selectors
-- `ERROR_BOUNDARY_TEXTS`: pipe-delimited fallback text markers
+```bash
+npm run dev
+```
 
-## Parametric Routes
+Interactive SSO/MFA flow (headed browser opens, then waits):
 
-To unskip parametric routes, edit `routes/routes.ts` and add `params`, for example:
+```bash
+npm run auth:save:interactive
+```
+
+## Live Progress + Outputs
+
+During execution:
+- `reports/live-progress.html` (auto-refreshes every second)
+- `reports/live-progress.json`
+
+After execution:
+- `reports/spa-health-check-<timestamp>.json`
+- `screenshots/*.png` for failed routes
+- `reports/zippy-handoff-<timestamp>.md` when failures exist
+
+Exit code:
+- `0` if no route failed
+- `1` if one or more routes failed
+
+## Common Commands
+
+```bash
+# Build TypeScript
+npm run build
+
+# Run compiled output
+npm start
+
+# Save auth state (headless/scripted)
+npm run auth:save
+```
+
+## Key Configs (`.env`)
+
+- `AUTH_MODE`: `ui-login` or `storage-only`
+- `AUTH_SUCCESS_SELECTOR`: selector that indicates post-login success
+- `INTERACTIVE_AUTH_TIMEOUT_MS`: max wait for interactive login completion
+- `HEALTH_CHECK_CONCURRENCY`: number of route workers
+- `HEALTH_CHECK_HEADLESS`: `true` / `false`
+- `HEALTH_CHECK_SLOW_MO_MS`: browser action slowdown in ms
+- `IGNORE_CONSOLE_ERRORS`: pipe-delimited ignore patterns for noisy console errors
+- `TARGET_CODEBASE_PATH`: repo path used for remediation code search
+- `AUTO_REMEDIATION_ENABLED`: run zippy commands automatically on failures
+- `ZIPPY_COMMAND`: command template for remediation
+- `ZIPPY_MR_COMMAND`: optional follow-up MR command
+
+## Route Parameters (`:id` routes)
+
+Parametric routes are intentionally marked `SKIPPED` until you provide concrete params.
+
+Example:
 
 ```ts
 {
@@ -129,3 +141,73 @@ To unskip parametric routes, edit `routes/routes.ts` and add `params`, for examp
   params: { id: '12345' }
 }
 ```
+
+## Troubleshooting
+
+### Browser does not launch (`Executable doesn't exist`)
+
+Install Playwright browser binaries:
+
+```bash
+npx playwright install chromium
+```
+
+If needed, reinstall after Playwright version changes.
+
+### Login succeeds visually, but script does not detect success
+
+Update `AUTH_SUCCESS_SELECTOR` in `.env` to a stable post-login element.
+
+Example:
+
+```env
+AUTH_SUCCESS_SELECTOR=[class^="Navbar"]
+```
+
+Also increase interactive timeout if SSO is slow:
+
+```env
+INTERACTIVE_AUTH_TIMEOUT_MS=300000
+```
+
+### Routes open under `/signin/...` and fail unexpectedly
+
+Ensure `BASE_URL` is origin-only.
+
+Correct:
+
+```env
+BASE_URL=https://phoenix.app.zetaglobal.net
+```
+
+Incorrect:
+
+```env
+BASE_URL=https://phoenix.app.zetaglobal.net/signin
+```
+
+### Healthy pages reported as failed due to console noise
+
+Tune `IGNORE_CONSOLE_ERRORS` in `.env` (pipe-delimited patterns).
+
+Example:
+
+```env
+IGNORE_CONSOLE_ERRORS=Failed to load resource|ResizeObserver loop limit exceeded
+```
+
+### Interactive auth opens login page but fields are not filled
+
+Verify `E2E_USER` format:
+
+```env
+E2E_USER=email@example.com:password
+```
+
+If auth flow is custom/SSO-heavy, use:
+
+```bash
+npm run auth:save:interactive
+```
+
+and complete sign-in manually.
