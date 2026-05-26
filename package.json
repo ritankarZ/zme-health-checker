@@ -1,0 +1,27 @@
+{
+  "name": "spa-health-checker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lightweight SPA runtime health checker using Playwright",
+  "main": "dist/health-check.js",
+  "scripts": {
+    "dev": "ts-node src/health-check.ts",
+    "dev:headed": "HEALTH_CHECK_HEADLESS=false HEALTH_CHECK_SLOW_MO_MS=200 ts-node src/health-check.ts",
+    "dev:headed:with-auth": "pnpm auth:save:headed && pnpm dev:headed",
+    "start": "node dist/health-check.js",
+    "build": "tsc",
+    "auth:save": "ts-node src/auth.ts --save",
+    "auth:save:headed": "ts-node src/auth.ts --save --headed",
+    "auth:save:interactive": "ts-node src/auth.ts --save --interactive"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "dotenv": "^16.4.5",
+    "playwright": "^1.54.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.8",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}

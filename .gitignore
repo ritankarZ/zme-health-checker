@@ -1,0 +1,10 @@
+node_modules
+.venv
+dist
+.auth/storageState.json
+reports/*.json
+reports/live-progress.html
+reports/live-progress.json
+reports/zippy-handoff-*.md
+screenshots/*.png
+.env
